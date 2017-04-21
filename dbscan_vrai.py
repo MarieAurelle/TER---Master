@@ -3,7 +3,7 @@
 ###################################
 	
 Bruit = []; # liste contenant les especes ne pouvant etre classees dans un cluster et donc associee a du bruit
-C = [[]]; # liste de listes contenant chacune un cluster
+
 
 ## initialisation de la liste visite indiquant si l espece a deja ete traitee ###
 def init_visite(nbElements) :
@@ -23,7 +23,7 @@ def union(liste1, liste2) :
 	return liste1;
 	
 ## determine si l espece P est deja classee dans un cluster ##
-def membreCluster(P) : 
+def membreCluster(P, C) : 
 	i = 0;
 	while i < len(C) :
 		if P in C[i] : return True;
@@ -44,7 +44,7 @@ def epsilonVoisinage(matriceD, P, eps) :
 
 
 ## ajoute au cluster de P les especes voisines de P et les voisines de ces voisines sauf si elles appartiennent deja a un autre cluster ##
-def etendreCluster(matriceD, P, PtsVoisins, eps, MinPts, compteurClusters, visite) :
+def etendreCluster(matriceD, P, PtsVoisins, eps, MinPts, compteurClusters, visite, C) :
 	listeVide = [];
 	if(compteurClusters > 0) : C.append(listeVide);
 	
@@ -58,55 +58,94 @@ def etendreCluster(matriceD, P, PtsVoisins, eps, MinPts, compteurClusters, visit
 			PtsVoisinsBis = epsilonVoisinage(matriceD, PtsVoisins[i], eps);
 			if len(PtsVoisinsBis) >= MinPts :
 				PtsVoisins = union(PtsVoisins, PtsVoisinsBis);
-		if membreCluster(PtsVoisins[i]) == False : 
+		if membreCluster(PtsVoisins[i], C) == False : 
 			C[compteurClusters].append(PtsVoisins[i]);
 			if(PtsVoisins[i] in Bruit) : Bruit.remove(PtsVoisins[i]);
 				
 		i = i+1;
 
 ## algorithme DBSCAN ##
-def dbscan(matriceD, eps, MinPts) :
+def dbscan(matriceD, eps, MinPts, depart) :
 	 ##initialisation##
 	 visite = init_visite(len(matriceD));
 	 i = 0;
+	 compteurEspeces = depart -1;
 	 PtsVoisins = [];
 	 compteurCluster = 0; 
+	 C = [[]]; # liste de listes contenant chacune un cluster
 	 
 	 ##boucle principale## 
 	 while i < len(matriceD) :
-		 if visite[i] == "NON" :
-			 visite[i] = "OUI";
-			 PtsVoisins = epsilonVoisinage(matriceD, i+1, eps);
+		 if visite[compteurEspeces] == "NON" :
+			 visite[compteurEspeces] = "OUI";
+			 PtsVoisins = epsilonVoisinage(matriceD, compteurEspeces+1, eps);
 			 if len(PtsVoisins) < MinPts :
-				 Bruit.append(i+1);
+				 Bruit.append(compteurEspeces+1);
 			 else : 
-				etendreCluster(matriceD, i+1, PtsVoisins, eps, MinPts, compteurCluster, visite);
+				etendreCluster(matriceD, compteurEspeces+1, PtsVoisins, eps, MinPts, compteurCluster, visite, C);
 				compteurCluster = compteurCluster + 1;
 		 i = i+1;
+		 compteurEspeces = (compteurEspeces + 1)%len(matriceD)
 	 return C; 
 				
 		
-
+## Fonction permettant de vider la liste de clusters C ##
+def vider_C() :
+	i = 0;
+	while i < len(C) :
+		del(C[i][:]);
+		i = i+1;
 
 ####  Fonction main   ####
 if __name__ == '__main__':
-	
+
 	### Algo DBSCAN ### 
+	Ctemp = [[]];
 	matrice = np.genfromtxt("matrice.txt", delimiter = " ");
 	print(matrice);
-	print("Saisie d epsilon");
-	eps = input();
 	
-	print("Saisie de MinPts");
+	print("Saisie de MinPts\n");
 	MinPts = input();
-	
-	f = open("result_DBSCAN.csv", 'a');
-	dbscan(matrice, int(eps), int(MinPts));
-	i = 0;
-	while i < len(C) :
-		np.savetxt(f, C[i], fmt = '%1.0f', newline = ',');
-		f.write("\n");
+	print("Saisie d epsilon\n");
+	eps = input();
+	print("Saisie de depart\n");
+	depart = input();
+
+	Ctemp = dbscan(matrice, eps, MinPts, depart);
+	## sortie fichier 1 ligne = 1 espece dans un groupe ##
+	nomfichier = "result_DBSCAN_" + str(eps) + "-" + str(MinPts) + "-" + str(depart) + ".txt";
+	fichier = open(nomfichier, 'a');
+	i = 1;
+	while i <= len(matrice) :
+		if i in Bruit :
+			fichier.write("%d 0\n"%(i));
+		else :
+			j = 0; 
+			while i not in Ctemp[j] : 
+				j = j+1;
+			fichier.write("%d %d\n"%(i, j+1));
 		i = i+1;
-	print(C);
-	print(Bruit);
+	
+	k = 100;
+	l = 0;
+	tps1 = time.clock();
+	f = open("epsDBSCAN.txt", 'w');
+	
+	#test nombre de groupes obtenus en fonction d epsilon
+	while k > 0 :
+		l = 0;
+		del(Bruit[:]);
+		Ctemp = dbscan(matrice, k, 5, 1);
+		print("k :");
+		print(k);
+		print(Ctemp);
+		f.write("%d %d %d"%(k, len(Ctemp), len(Bruit)));
+		while l < len(Ctemp) :
+			f.write(" %d "%(len(Ctemp[l])));
+			l = l+1;
+		f.write("\n");
+		k = k-1;
+	tps2 = time.clock();
+	print("temps");
+	print(tps2-tps1);	
 	f.close();
