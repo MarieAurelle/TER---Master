@@ -1,3 +1,10 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*
+import numpy as np
+import time
+import random
+from sklearn.cluster import DBSCAN
+
 ####################################
 ##### Algorithme DBSCAN ############
 ###################################
@@ -65,28 +72,26 @@ def etendreCluster(matriceD, P, PtsVoisins, eps, MinPts, compteurClusters, visit
 		i = i+1;
 
 ## algorithme DBSCAN ##
-def dbscan(matriceD, eps, MinPts, depart) :
+def dbscan(matriceD, eps, MinPts, ordre) :
 	 ##initialisation##
-	 visite = init_visite(len(matriceD));
-	 i = 0;
-	 compteurEspeces = depart -1;
-	 PtsVoisins = [];
-	 compteurCluster = 0; 
-	 C = [[]]; # liste de listes contenant chacune un cluster
+	visite = init_visite(len(matriceD));
+	i = 0;
+	PtsVoisins = [];
+	compteurCluster = 0; 
+	C = [[]]; # liste de listes contenant chacune un cluster
 	 
 	 ##boucle principale## 
-	 while i < len(matriceD) :
-		 if visite[compteurEspeces] == "NON" :
-			 visite[compteurEspeces] = "OUI";
-			 PtsVoisins = epsilonVoisinage(matriceD, compteurEspeces+1, eps);
-			 if len(PtsVoisins) < MinPts :
-				 Bruit.append(compteurEspeces+1);
-			 else : 
-				etendreCluster(matriceD, compteurEspeces+1, PtsVoisins, eps, MinPts, compteurCluster, visite, C);
+	while i < len(ordre) :
+		if visite[ordre[i]-1] == "NON" :
+			visite[ordre[i]-1] = "OUI";
+			PtsVoisins = epsilonVoisinage(matriceD, ordre[i], eps);
+			if len(PtsVoisins) < MinPts :
+				Bruit.append(ordre[i]);
+			else : 
+				etendreCluster(matriceD, ordre[i], PtsVoisins, eps, MinPts, compteurCluster, visite, C);
 				compteurCluster = compteurCluster + 1;
-		 i = i+1;
-		 compteurEspeces = (compteurEspeces + 1)%len(matriceD)
-	 return C; 
+		i = i+1;
+	return C; 
 				
 		
 ## Fonction permettant de vider la liste de clusters C ##
@@ -96,56 +101,205 @@ def vider_C() :
 		del(C[i][:]);
 		i = i+1;
 
+##Fonctions de sortie##
+## 1 individu par ligne avec le numero du cluster
+## les individus sont ranges par ordre croissant de numero
+def sortie_ligne_espece(C, matrice, nom_fichier) :
+	fichier = open(nom_fichier, 'w');
+	i = 0;
+	while i < len(matrice) :
+		j = 0; 
+		while i not in C[j] : 
+			j = j+1;
+		fichier.write("%d %d\n"%(i+1, j+1));
+		i = i+1;
+	fichier.close();
+
+## tous les numeros de clusters des individus sur la meme ligne
+##les individus sont ranges par ordre croissant de numero
+def sortie_ligne_cluster(C, matrice, nom_fichier) :
+	fichier = open(nom_fichier, 'w');
+	i = 0;
+	while i < len(matrice) :
+		for j in range(0, len(C)) :
+			if i in C[j] : fichier.write("%d "%(C[j]));
+		i = i+1;
+
+## Fonction permettant de choisir aleatoirement l ordre de traitements
+# des individus
+def choix_depart_alea(nbEspeces) :
+	liste = [];
+	i = 0;
+	while i < nbEspeces :
+		alea = random.randint(1,nbEspeces);
+		while alea in liste :
+			alea = random.randint(1,nbEspeces);
+		liste.append(alea);
+		i = i+1;
+		print(i);
+		print(alea);
+	return liste;
+
+##Calcule le diametre des cluster
+## et les stocke dans une liste
+def calcul_diametre(C, matrice) :
+	liste_diam = [];
+	i = 0
+	while i < len(C) : #chaque cluster
+		j = 0
+		k = 0
+		maximum = matrice[C[i][j]-1][C[i][k]-1];
+		while j < len(C[i]) : # interieur d un cluster
+			k = j;
+			while k < len(C[i]) :
+				temp = matrice[C[i][j]-1][C[i][k]-1];
+				if temp > maximum :
+					maximum = temp;
+				k = k+1;
+			j = j+1;
+		liste_diam.append(maximum);
+		i = i+1;
+	return liste_diam;
+
+##Calcule la distance moyenne intra cluster de tous les clusters
+## et les stocke dans une liste
+def calcul_dist_moyenne(C, matrice) :
+	liste_moy = [];
+	i = 0
+	while i < len(C) : #chaque cluster
+		j = 0
+		somme = 0.0;
+		while j < len(C[i]) : # interieur d un cluster
+			k = j;
+			while k < len(C[i]) :
+				somme += matrice[C[i][j]-1][C[i][k]-1];
+				k = k+1;
+			j = j+1;
+		if(len(C[i]) > 1 ) : liste_moy.append(somme/((len(C[i])*(len(C[i])-1))/2.0));
+		else : liste_moy.append(somme);
+		i = i+1;
+	return liste_moy;
+
+
+##Calcule la distance moyenne inter cluster entre tous les clusters
+## et les stocke dans une liste
+def calcul_dist_intercluster(C, matrice) :
+	liste_moy = [];
+	i = 0
+	while i < len(C) :
+		j = i+1
+		while j < len(C) :
+			somme = 0.0;
+			k = 0
+			while k < len(C[i]) :
+				m = 0 
+				while m < len(C[j]) :
+					somme += matrice[C[i][k]-1][C[j][m]-1];
+					m = m+1;
+				k = k+1;
+			liste_moy.append(somme/(len(C[i])*len(C[j])));
+			j = j+1;
+		i = i+1;
+	return liste_moy;
+	print(liste_moy);
+
+
+##Calcule la distance inter cluster minimale entre tous les clusters
+## et les stocke dans une liste	
+def calcul_distance_inter_minimale(C, matrice) :
+	liste_dist = [];
+	i = 0
+	while i < len(C) :
+		j = i+1
+		while j < len(C) :
+			minimum = 215;
+			k = 0
+			while k < len(C[i]) :
+				m = 0 
+				while m < len(C[j]) :
+					dist = matrice[C[i][k]-1][C[j][m]-1];
+					print((i,j));
+					print(dist);
+					if(dist < minimum) :
+						minimum = dist;
+					m = m+1;
+				k = k+1;
+			liste_dist.append(minimum);
+			j = j+1;
+		i = i+1;
+	return liste_dist;
+	print(liste_dist);
+
+##Permet d'obtenir une liste de clusters a partir de la sortie de l algorithme du package
+def convertisseur(dbscan) :
+	nb_clusters = len(set(dbscan.labels_)) - (1 if -1 in dbscan.labels_ else 0)
+	C = [];
+	for i in range(nb_clusters) :
+		liste = []
+		C.append(liste) 
+	print(C);
+	for j in range(215) :
+		if(dbscan.labels_[j] == -1) : Bruit.append(j);
+		else : C[dbscan.labels_[j]].append(j);
+	return C
+	
 ####  Fonction main   ####
 if __name__ == '__main__':
-
-	### Algo DBSCAN ### 
-	Ctemp = [[]];
+	
+	### Algo DBSCAN  ### 
 	matrice = np.genfromtxt("matrice.txt", delimiter = " ");
 	print(matrice);
-	
+
+	tps1 = time.clock();
+	depart = range(1,216)
+	C = [];
 	print("Saisie de MinPts\n");
 	MinPts = input();
 	print("Saisie d epsilon\n");
 	eps = input();
-	print("Saisie de depart\n");
-	depart = input();
-
-	Ctemp = dbscan(matrice, eps, MinPts, depart);
-	## sortie fichier 1 ligne = 1 espece dans un groupe ##
-	nomfichier = "result_DBSCAN_" + str(eps) + "-" + str(MinPts) + "-" + str(depart) + ".txt";
-	fichier = open(nomfichier, 'a');
-	i = 1;
-	while i <= len(matrice) :
-		if i in Bruit :
-			fichier.write("%d 0\n"%(i));
-		else :
-			j = 0; 
-			while i not in Ctemp[j] : 
-				j = j+1;
-			fichier.write("%d %d\n"%(i, j+1));
-		i = i+1;
-	
-	k = 100;
-	l = 0;
-	tps1 = time.clock();
-	f = open("epsDBSCAN.txt", 'w');
-	
-	#test nombre de groupes obtenus en fonction d epsilon
-	while k > 0 :
-		l = 0;
-		del(Bruit[:]);
-		Ctemp = dbscan(matrice, k, 5, 1);
-		print("k :");
-		print(k);
-		print(Ctemp);
-		f.write("%d %d %d"%(k, len(Ctemp), len(Bruit)));
-		while l < len(Ctemp) :
-			f.write(" %d "%(len(Ctemp[l])));
-			l = l+1;
-		f.write("\n");
-		k = k-1;
+	C = dbscan(matrice, eps, MinPts, depart);
 	tps2 = time.clock();
-	print("temps");
 	print(tps2-tps1);	
-	f.close();
+	
+	sortie_ligne_espece("result_DBSCAN"+str(eps)+"-"+str(MinPts) + ".txt", matrice, C);
+	
+	liste_diam = calcul_diametre(C, matrice);
+	liste_moy_intra = calcul_dist_moyenne(C, matrice);
+	liste_moy_inter = calcul_dist_intercluster(C, matrice);
+	liste_min = calcul_distance_inter_minimale(C, matrice);
+	
+	print(liste_diam)
+	print(liste_moy_intra)
+	print(liste_moy_inter);
+	print(liste_min);
+	
+	#### Algo DBSCAN avec le package ########
+	print("Saisie de MinPts\n");
+	MinPts = input();
+	print("Saisie d epsilon\n");
+	eps = input();
+	dbscan = DBSCAN(eps = eps, min_samples = MinPts, metric = 'precomputed', algorithm = 'auto')
+	dbscan.fit(matrice);
+	print(dbscan)
+	print(dbscan.labels_)
+	C = convertisseur(dbscan);
+	
+	liste_diam = calcul_diametre(C, matrice);
+	liste_moy_intra = calcul_dist_moyenne(C, matrice);
+	liste_moy_inter = calcul_dist_intercluster(C, matrice);
+	liste_dist_min = calcul_distance_inter_minimale(C, matrice);
+		
+	print(liste_diam);
+	print(liste_moy_intra);
+	print(liste_moy_inter);
+	print(liste_dist_min);
+	
+	
+	
+	
+	
+
+	
+	
+	
+

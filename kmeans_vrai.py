@@ -4,9 +4,12 @@
 import numpy as np
 import random
 import time
+from math import sqrt
+from sklearn.cluster import KMeans
+
 
 ## Fonction permettant de vider la liste de clusters C ##
-def vider_C(nbClusters) :
+def vider_C(C, nbClusters) :
 	i = 0;
 	while i < nbClusters :
 		del(C[i][:]);
@@ -110,20 +113,22 @@ def calcul_centres_clusters(matrice, centres, C) :
 	return centres;	
 
 ## Algorithme k moyenne ##
-def kmeans(matriceD, nbClusters, K, centres, C) :	
+def kmeans(matriceD, nbClusters, K, centres, C, numeros_centres) :	
 	entree1 = True;
 	centres_nouv = list(centres);
 	compteur = 0;
-
+	
 	## ajout des premiers centres comme premier element de chaque cluster ##
 	i = 0;
 	while i<nbClusters :
 		C[i].append(numeros_centres[i]);
 		i = i+1;	
+	print(C);
 	
-	
-	while entree1 or (calcul_distance_centres(centres, centres_nouv) > 0.0 and compteur < K):## condition darret plus de modification des vecteurs moyennes ou compteur depasse
-		if (C and entree1 == False) : vider_C(nbClusters);
+	while entree1 or (calcul_distance_centres(centres, centres_nouv) > 1e-4 and compteur < K):## condition darret plus de modification des vecteurs moyennes ou compteur depasse
+		print(compteur);
+		
+		if (C and entree1 == False) : vider_C(C, nbClusters);
 
 		centres = list(centres_nouv);
 		entree1 = False;
@@ -137,80 +142,227 @@ def kmeans(matriceD, nbClusters, K, centres, C) :
 		
 		compteur = compteur +1;
 	print(compteur);
+	print(C);
+	return centres_nouv;
 
+##Calcul la somme des carres des distances de chaque element dun cluster a son centre
+## pour chaque cluster	
+def calcul_somme_carres(matrice, C, centres) :
+	i = 0
+	liste_somme_carres = []
+	while i < len(C) :
+		j = 0
+		somme = 0.0
+		while j < len(C[i]) :
+			somme += calcul_distance_vecteurs(matrice, C[i][j], centres[i]);
+			j = j+1
+		liste_somme_carres.append(somme);
+		i = i+1
+	i = 0
+	somme_Tot = 0.0
+	while i < len(C) :
+		somme_Tot += liste_somme_carres[i];
+		i = i+1
+	return somme_Tot;
+		
+
+## Fonctions de sortie ##
+## 1 individu par ligne avec le numero du cluster
+## les individus sont ranges par ordre croissant de numero
+def sortie_ligne_espece(C, matrice, nom_fichier) :
+	fichier = open(nom_fichier, 'w');
+	i = 0;
+	while i < len(matrice) :
+		j = 0; 
+		while i not in C[j] : 
+			j = j+1;
+		fichier.write("%d %d\n"%(i+1, j+1));
+		i = i+1;
+	fichier.close();
+
+## tous les numeros de clusters des individus sur la meme ligne
+##les individus sont ranges par ordre croissant de numero
+def sortie_ligne_cluster(C, matrice, nom_fichier) :
+	fichier = open(nom_fichier, 'w');
+	i = 0;
+	while i < len(matrice) :
+		for j in range(0, len(C)) :
+			if i in C[j] : fichier.write("%d "%(C[j]));
+		i = i+1;
+
+##Calcule le diametre des cluster
+## et les stocke dans une liste
+def calcul_diametre(C, matrice) :
+	liste_diam = [];
+	i = 0
+	while i < len(C) : #chaque cluster
+		j = 0
+		maximum = 0.0
+		while j < len(C[i]) :
+			k = j+1
+			temp = 0.0
+			while k < len(C[i]) :
+				l = 0
+				print(k);
+				while l < len(matrice[0]) :
+					temp += (matrice[C[i][j]][l] - matrice[C[i][k]][l])*(matrice[C[i][j]][l] - matrice[C[i][k]][l]);
+					l = l+1
+				temp = sqrt(temp)
+				if temp > maximum :
+					maximum = temp;
+					print(maximum);
+				k = k+1
+			j = j+1
+		liste_diam.append(maximum);
+		i = i+1;
+	return liste_diam;
+
+##Calcule la distance moyenne intra cluster de tous les clusters
+## et les stocke dans une liste
+def calcul_dist_moyenne(C, matrice) :
+	liste_moy = [];
+	i = 0
+	while i < len(C) : #chaque cluster
+		j = 0
+		somme = 0.0
+		while j < len(C[i]) :
+			k = j+1
+			temp = 0.0
+			while k < len(C[i]) :
+				l = 0
+				print(k);
+				while l < len(matrice[0]) :
+					temp += (matrice[C[i][j]][l] - matrice[C[i][k]][l])*(matrice[C[i][j]][l] - matrice[C[i][k]][l]);
+					l = l+1
+				temp = sqrt(temp)
+				somme += temp;
+				print(somme)
+				k = k+1
+			j = j+1
+		if len(C[i]) > 1 :
+			liste_moy.append(somme/((len(C[i])*(len(C[i])-1))/2));
+		i = i+1;
+	return liste_moy;
+
+##Calcule la distance moyenne inter cluster entre tous les clusters
+## et les stocke dans une liste
+def calcul_dist_intercluster(C, matrice) :
+	liste_moy = [];
+	i = 0
+	while i < len(C) : #chaque cluster
+		m = i+1
+		while m < len(C) :
+			somme = 0.0
+			j = 0
+			while j < len(C[i]) :
+				k = 0
+				temp = 0.0
+				while k < len(C[m]) :
+					l = 0
+					print(k)
+					while l < len(matrice[0]) :
+						temp += (matrice[C[i][j]][l] - matrice[C[m][k]][l])*(matrice[C[i][j]][l] - matrice[C[m][k]][l]);
+						l = l+1
+					print(k)
+					print(j);
+					temp = sqrt(temp)
+					somme += temp;
+					print(somme)
+					k = k+1
+				j = j+1
+			print(len(C[i]));
+			print(len(C[m]));
+			liste_moy.append(somme/(len(C[i])*len(C[m])));
+			m = m+1
+		i = i+1;
+	return liste_moy;
+
+##Calcule la distance inter cluster minimale entre tous les clusters
+## et les stocke dans une liste		
+def calcul_distance_inter_minimale(C, matrice) :
+	liste_dist = [];
+	i = 0
+	while i < len(C) :
+		j = i+1
+		while j < len(C) :
+			minimum = 215;
+			k = 0
+			while k < len(C[i]) :
+				m = 0 
+				print(k)
+				while m < len(C[j]) :
+					dist = matrice[C[i][k]-1][C[j][m]-1];
+					print((i,j));
+					print(dist);
+					if(dist < minimum) :
+						minimum = dist;
+					m = m+1;
+				k = k+1;
+			liste_dist.append(minimum);
+			j = j+1;
+		i = i+1;
+	return liste_dist;
+	
+##Permet d'obtenir une liste de clusters a partir de la sortie de l algorithme du package	
+def convertisseur(kmeans) :
+	nb_clusters = len(set(kmeans.labels_));
+	C = [];
+	for i in range(nb_clusters) :
+		liste = []
+		C.append(liste) 
+	print(C);
+	for j in range(215) :
+		C[kmeans.labels_[j]].append(j);
+	print("C"); 
+	print(C)
+	return C
 
 if __name__ == '__main__':
-	
+
+	##Algorithme kmeans##
 	matrice = np.genfromtxt("matrice_alleles2.txt", delimiter = " ");
 	print(matrice);
-	#f = open("Kmeans/result_kmeans_3-50-1-2-5.txt", 'a');
-	C = [[]];
-	print(C);
-	#ecriture dans fichier 1 ligne = 1 cluster
-	#i = 0;
-	#while i < len(C) :
-	#	np.savetxt(f, C[i], fmt = '%1.0f', newline = ',');
-	#	f.write("\n");
-	#	i = i+1;
-	k = 0
-	numeros_centres = [];
-	#test nombre de groupes obtenus en fonction des centres de depart
-	#while k < 50 :
-	#	l = 0;
-	#	del(numeros_centres[:]);
-	#	C = [[]];
-	#	centres = choix_k_alea(matrice, 3, numeros_centres, C); 
-	#	kmeans(matrice, 3, 50, centres, C);
-	#	print("k :");
-	#	print(k);
-	#	print(C);
-	#	f.write("%d %d %d %d"%(numeros_centres[0], numeros_centres[1], numeros_centres[2], len(C)));
-	#	while l < len(C) :
-	#		f.write(" %d "%(len(C[l])));
-	#		l = l+1;
-	#	f.write("\n");
-	#	k = k+1;
-	#	vider_C(3);
-	#tps2 = time.clock();
-	#print("temps");
-	#print(tps2-tps1);	
 	
-	#test nombre de groupes obtenus en fonction de depart non aleatoires
-	#k = 2
-	#while k < 215 : 
-	#	l = 0;
-	#	C = [[]];
-	#	numeros_centres = [0,1,k];
-	#	centres = choix_k_nonAlea(matrice, 3, numeros_centres, C);
-	#	kmeans(matrice, 3, 50, centres, C);
-	#	f.write("%d %d %d %d"%(numeros_centres[0] + 1, numeros_centres[1]+1, numeros_centres[2]+1, len(C)));
-	#	while l < len(C) :
-	#		f.write(" %d "%(len(C[l])));
-	#		l = l+1;
-	#	f.write("\n");
-	#	k = k+1;
-	#	vider_C(3);	
-	#print(C);
-	
-	k = 5;
-	#ecriture dans un fichier 1 espece dans un groupe = 1 ligne
-	while k < 215 :  
+	Cmin = [];
+	sommeMin = 10000;
+	for j in range(1,10) :
 		C = [[]];
-		nomfichier = "Kmeans/result_kmeans_3-50-1-2-" + str(k) + ".txt";
-		f = open(nomfichier, 'a');
-		numeros_centres = [0,1,k];
-		centres = choix_k_nonAlea(matrice, 3, numeros_centres, C);
-		kmeans(matrice, 3, 50, centres, C);
-		i = 0;
-		while i < len(matrice) :
-			j = 0; 
-			while i not in C[j] : 
-				j = j+1;
-			f.write("%d %d\n"%(i+1, j+1));
-			i = i+1
-		k = k+1
-		vider_C(3);
-		f.close();
+		numeros_centres = [];
+	
+		centres = choix_k_alea(matrice, 3, numeros_centres, C);
+		centres = kmeans(matrice, 3, 50, centres, C, numeros_centres); 
+		
+		somme = calcul_somme_carres(matrice, C, centres);
+		print(somme);
+		if sommeMin > somme :
+			sommeMin = somme;
+			Cmin = list(C);
+		j = j+1;
+		
+	liste_diam = calcul_diametre(Cmin, matrice);
+	liste_moy_intra = calcul_dist_moyenne(Cmin, matrice);
+	liste_moy_inter = calcul_dist_intercluster(Cmin, matrice);	
+	liste_min = calcul_distance_inter_minimale(Cmin, matrice);
+	print(liste_diam);
+	print(liste_moy_intra)
+	print(liste_moy_inter)
+	print(liste_min);
+	
+	##Algo Kmeans package##
+	kmeans = KMeans(n_clusters = 2, n_init = 100, init = 'k-means++');
+	kmeans.fit(matrice);
+	C = convertisseur(kmeans);
+	
+	liste_diam = calcul_diametre(C, matrice);
+	liste_moy_intra = calcul_dist_moyenne(C, matrice);
+	liste_moy_inter = calcul_dist_intercluster(C, matrice);
+	liste_dist_min = calcul_distance_inter_minimale(C, matrice);
+		
+	print(liste_diam);
+	print(liste_moy_intra);
+	print(liste_moy_inter);
+	print(liste_dist_min);
+	
 	
 	
 	

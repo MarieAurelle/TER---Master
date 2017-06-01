@@ -53,20 +53,38 @@ def toutes_permutations(nbClusters) :
 		i = i+1;
 	return permutations;
 		
-def calcul_distance(fichier1, fichier2, nouveauNoClusters) :
+def calcul_distance(fichier1, fichier2, nouveauNoClusters, nbClusters) :
 	cluster1 = -1;
 	cluster2 = -1;
-	nbDiff = 0;
-	
+	i = 0;
+	nbDiffParClusters = [];
+	while i < nbClusters:
+		nbDiffParClusters.append(0);
+		i = i+1; 
+		
 	i = 0;
 	for ligne in fichier1.readlines():
 		cluster1 = ligne.split(" ")[1];
 		cluster2 = fichier2.readline().split(" ")[1];
 		cluster2 = nouveauNoClusters[int(cluster2)];
-		if(int(cluster1) != int(cluster2)) : nbDiff = nbDiff + 1;
+		if(int(cluster1) != int(cluster2)) :
+			nbDiffParClusters[0] = nbDiffParClusters[0] + 1;
+			nbDiffParClusters[int(cluster1)] = nbDiffParClusters[int(cluster1)] + 1;
 		i = i+1;
-	return nbDiff;
+	return nbDiffParClusters;
 
+##Donne la taille des clusters contenu dans le fichier passe en parametre	
+def taille_clusters(fichier1, nbClusters) :
+	i=0;
+	taille = [];
+	while i < nbClusters -1:
+		taille.append(0);
+		i = i+1; 
+	for ligne in fichier1.readlines() :
+		taille[int(ligne.split(" ")[1])-1] = taille[int(ligne.split(" ")[1])-1] + 1;
+	return taille;
+	
+	
 def distance_clustering(nomfichier1, nomfichier2, nbClusters) :
 	fichier1 = open(nomfichier1, 'r');
 	fichier2 = open(nomfichier2, 'r');
@@ -75,17 +93,27 @@ def distance_clustering(nomfichier1, nomfichier2, nbClusters) :
 	
 	permutations = [[]];
 	permutations = toutes_permutations(nbClusters);
-	nbDiff = 0;
 	i = 1;
 	
-	minimum = calcul_distance(fichier1, fichier2, permutations[0]);
+	taille = taille_clusters(fichier1, nbClusters);
+	print(taille);
+	
+	fichier1.seek(0);
+	fichier2.seek(0);
+	minimum = calcul_distance(fichier1, fichier2, permutations[0], nbClusters);
+	#print(minimum);
 	
 	while i<len(permutations) :
 		fichier1.seek(0);
 		fichier2.seek(0);
-		nbDiff = calcul_distance(fichier1, fichier2, permutations[i]);
-		if(nbDiff < minimum) : 
-			minimum = nbDiff;
+		nbDiff = calcul_distance(fichier1, fichier2, permutations[i], nbClusters);
+		print(nbDiff);
+		if(nbDiff[0] < minimum[0]) : 
+			j = 0;
+			while j < nbClusters :
+				minimum[j] = nbDiff[j];
+				j = j+1;
+			print(minimum);
 		i = i+1;
 		
 	fichier1.close();
@@ -102,9 +130,11 @@ if __name__ == '__main__':
 	nomfichier2 = raw_input();
 	print("Saisie nombre clusters ");
 	nbClusters = raw_input();
-
-	dist = distance_clustering(nomfichier1, nomfichier2, int(nbClusters)); 
-	print("distance");
-	print(dist);
+	
+	dist = distance_clustering(nomfichier1, nomfichier2, int(nbClusters));
+	print(dist)
+	
+	
+	
 	
 
